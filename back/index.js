@@ -1,116 +1,98 @@
-// import express from "express";
-// const app = express();
-// const port = 3000;
+import { ApolloServer, gql } from "apollo-server-express";
+import express from "express";
+import http from "http";
+import { PubSub } from "graphql-subscriptions";
 
-// app.get("/", (req, res) => {
-//   res.send("Hello World!");
-// });
+import { SubscriptionServer } from "subscriptions-transport-ws";
+import { makeExecutableSchema } from "@graphql-tools/schema";
+import { execute, subscribe } from "graphql";
 
-// app.listen(port, () => {
-//   console.log(`Example app listening on port ${port}`);
-// });
+const pubsub = new PubSub();
 
-import { ApolloServer } from "@apollo/server";
-import { startStandaloneServer } from "@apollo/server/standalone";
-
-// A schema is a collection of type definitions (hence "typeDefs")
-// that together define the "shape" of queries that are executed against
-// your data.
-
-const typeDefs = `#graphql
-  # Comments in GraphQL strings (such as this one) start with the hash (#) symbol.
-  # This "Book" type defines the queryable fields for every book in our data source.
-
-  type Book {
+const typeDefs = gql`
+  type Message {
+    content: String
     id: Int
-    title: String
-    author: String
-  }
-
-  # The "Query" type is special: it lists all of the available queries that
-  # clients can execute, along with the return type for each. In this
-  # case, the "books" query returns an array of zero or more Books (defined above).
-  type Query {
-    books: [Book]
-    book(id: Int!): Book
   }
 
   type Mutation {
-    removeBook(id: Int!): Book
-    updateBook(id: Int!, title: String, author: String): Book
-    addBook(title: String!, author: String!): Book
+    addMessage(content: String): Message
+  }
+
+  type Query {
+    messages: [Message]
+    addMessage(messageContent: String!): Message
+  }
+
+  type Subscription {
+    messageAdded: Message
   }
 `;
 
-const books = [
-  {
-    id: 1,
-    title: "The Awakening",
-    author: "Kate Chopin",
-  },
-  {
-    id: 2,
-    title: "City of Glass",
-    author: "Paul Auster",
-  },
-];
+let messages = [];
+let messageId = 1;
 
 const resolvers = {
-  Query: {
-    books: () => books,
-    book: (_, { id } ) => books.find((book) => book.id === id)
-  },
   Mutation: {
-    removeBook: (_, { id }) => {
-      const bookIndex = books.findIndex((book) => book.id === id);
-      if (bookIndex === -1) {
-        throw new Error("Book not found");
-      }
-      const removedBook = books.splice(bookIndex, 1);
-      return removedBook[0];
-    },
-    updateBook: (_, { id, title, author }) => {
-      const bookIndex = books.findIndex((book) => book.id === id);
-      if(bookIndex === -1) {
-        throw new Error("Book not found");
-      }
-      const updatedBook = books[bookIndex]
-      if(title) {
-       updatedBook.title = title;
-      }
-      if(author) {
-        updatedBook.author = author;
-      }
-
-      books[bookIndex] = updatedBook;
-      return updatedBook
-
-    },
-    addBook: (_, { title, author }) => {
-      const newBook = {
-        id: books.length + 1,
-        title,
-        author,
+    addMessage: (_, { content }) => {
+      const messageToSend = {
+        id: messageId++,
+        content: content,
       };
-      books.push(newBook);
-      return newBook;
-    }
-  }
+      messages.push(messageToSend);
+      pubsub.publish("MESSAGE_ADDED", { messageAdded: messageToSend });
+      return messageToSend;
+    },
+  },
+  Query: {
+    messages: () => messages,
+  },
+  Subscription: {
+    messageAdded: {
+      subscribe: () => pubsub.asyncIterator(["MESSAGE_ADDED"]),
+    },
+  },
 };
 
-// The ApolloServer constructor requires two parameters: your schema
-// definition and your set of resolvers.
-const server = new ApolloServer({
+const app = express();
+const schema = makeExecutableSchema({
   typeDefs,
   resolvers,
 });
 
-// Passing an ApolloServer instance to the `startStandaloneServer` function:
-//  1. creates an Express app
-//  2. installs your ApolloServer instance as middleware
-//  3. prepares your app to handle incoming requests
-const { url } = await startStandaloneServer(server, {
-  listen: { port: 4000 },
+const apolloServer = new ApolloServer({
+  schema,
+  context: ({ req, res }) => {
+    return {
+      req,
+      res,
+      pubsub,
+    };
+  },
 });
 
-console.log(`🚀  Server ready at: ${url}`);
+const startServer = async () => {
+  await apolloServer.start();
+  apolloServer.applyMiddleware({ app });
+
+  const httpServer = http.createServer(app);
+  const PORT = 4000;
+
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
+  });
+  
+  new SubscriptionServer(
+    {
+      execute,
+      subscribe,
+      schema,
+    },
+    {
+      server: httpServer,
+      path: "/graphql",
+    }
+  );
+};
+
+startServer();
