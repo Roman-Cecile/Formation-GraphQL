@@ -1,0 +1,8 @@
+{
+  "name": "Formation-GraphQL",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:Roman-Cecile/Formation-GraphQL.git",
+  "author": "roman cecile",
+  "license": "MIT"
+}
