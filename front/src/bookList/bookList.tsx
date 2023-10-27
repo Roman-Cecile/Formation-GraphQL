@@ -1,5 +1,6 @@
 import { useQuery, gql, useMutation, useApolloClient } from "@apollo/client";
 import { useEffect, useState } from "react";
+import { CachePersistor, LocalStorageWrapper } from "apollo3-cache-persist";
 
 export const BookList = () => {
   const GET_BOOK = gql`

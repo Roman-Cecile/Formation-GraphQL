@@ -5,9 +5,10 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
 
+const cache = new InMemoryCache();
 const client = new ApolloClient({
   uri: "http://localhost:4000",
-  cache: new InMemoryCache(),
+  cache,
 });
 
 const root = ReactDOM.createRoot(
@@ -15,7 +16,7 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <ApolloProvider client={client}>
-    <App />
+    <App cache={cache} />
   </ApolloProvider>
 );
 
