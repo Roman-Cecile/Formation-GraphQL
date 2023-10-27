@@ -1,17 +1,10 @@
-import { useQuery, gql, useMutation, useLazyQuery } from "@apollo/client";
+import { useQuery, gql, useMutation, useApolloClient } from "@apollo/client";
 import { useEffect, useState } from "react";
 
 export const BookList = () => {
-  const FRAGMENT_DETAILS = gql`
-    fragment BookInfo on Book {
-      title
-      author
-      id
-    }
-  `;
-  const GET_BOOKS = gql`
-    query GetBook {
-      books {
+  const GET_BOOK = gql`
+    query GetBook($id: Int!) {
+      book(id: $id) {
         title
         author
         id
@@ -19,10 +12,11 @@ export const BookList = () => {
     }
   `;
 
-  const GET_BOOK = gql`
-    query GetBook($id: Int!) {
-      book(id: $id) {
-        ...${FRAGMENT_DETAILS}
+  const GET_BOOKS = gql`
+    query books {
+      books {
+        title
+        author
         id
       }
     }
@@ -48,15 +42,6 @@ export const BookList = () => {
     }
   `;
 
-  const GET_BOOK_WITH_FRAGMENT = gql`
-    query books {
-      books {
-        ...BookInfo
-      }
-    }
-    ${FRAGMENT_DETAILS}
-  `;
-
   const ADD_BOOK = gql`
     mutation AddBook($title: String!, $author: String!) {
       addBook(title: $title, author: $author) {
@@ -66,16 +51,14 @@ export const BookList = () => {
       }
     }
   `;
-  //   const { loading, error, data } = useQuery(GET_BOOKS);
-  const { loading, error, data } = useQuery(GET_BOOK_WITH_FRAGMENT);
+
+  const client = useApolloClient();
+
+  const { loading, error, data } = useQuery(GET_BOOKS);
   useEffect(() => {
     setBookList(data?.books);
   }, [data]);
-  const {
-    loading: loadingBook,
-    error: errorBook,
-    data: dataBook,
-  } = useQuery(GET_BOOK, {
+  const { data: dataBook } = useQuery(GET_BOOK, {
     variables: { id: 1 },
   });
 
@@ -116,10 +99,37 @@ export const BookList = () => {
     });
   };
 
-  console.log("test ====", inputIsActive.isActive);
+  const handleCache = async () => {
+    const { books } = await client.readQuery({ query: GET_BOOKS });
+    console.log("books ", books);
+    const filteredBooks = books.filter((book: any) => book.id !== 2);
+    console.log("filterted books ======", filteredBooks);
+    client.writeQuery({
+      query: GET_BOOKS,
+      data: {
+        books: filteredBooks,
+      },
+    });
+  };
+
+  // const handleCache = () => {
+  //   client.writeQuery({
+  //     query: GET_BOOKS,
+  //     data: {
+  //       books: {
+  //         ...BookList,
+  //         __typename: "Book",
+  //         id: 1,
+  //         title: "L'art de la guerre",
+  //         author: "Sun tzu",
+  //       },
+  //     },
+  //   });
+  // };
 
   return (
     <>
+      <button onClick={handleCache}>UPDATE CACHE</button>
       <p>ajouter un livre: </p>
       <div>
         <form>
@@ -145,39 +155,48 @@ export const BookList = () => {
       </div>
       <p>liste: </p>
       <div>
-        {BookList?.map(({ id, title, author }: any) => (
-          <div key={id}>
-            <h3 onClick={() => toggleInput(id)}>
-              {inputIsActive.isActive && id === inputIsActive.currentBookId ? (
-                <input
-                  value={inputValue}
-                  onChange={(event: any) => setInputValue(event.target.value)}
-                />
-              ) : (
-                title
-              )}
-              <p
-                onClick={() => {
-                  updateBook({
-                    variables: { id, title: inputValue },
-                  });
-                  setInputIsActive({
-                    ...inputIsActive,
-                    isActive: false,
-                  });
-                  console.log("inputIsActive", inputIsActive);
-                }}
-              >
-                Valider
-              </p>
-            </h3>
-            <br />
-            <b>About this author:</b>
-            <p>{author}</p>
-            <p onClick={() => handleClick(id)}>X</p>
-            <br />
-          </div>
-        ))}
+        {BookList &&
+          BookList.length > 0 &&
+          BookList.map(({ id, title, author }: any) => {
+            const { books } = client.readQuery({ query: GET_BOOKS });
+            console.log("books", books);
+            return (
+              <div key={id}>
+                <h3 onClick={() => toggleInput(id)}>
+                  {inputIsActive.isActive &&
+                  id === inputIsActive.currentBookId ? (
+                    <input
+                      value={inputValue}
+                      onChange={(event: any) =>
+                        setInputValue(event.target.value)
+                      }
+                    />
+                  ) : (
+                    title
+                  )}
+                  <p
+                    onClick={() => {
+                      updateBook({
+                        variables: { id, title: inputValue },
+                      });
+                      setInputIsActive({
+                        ...inputIsActive,
+                        isActive: false,
+                      });
+                      console.log("inputIsActive", inputIsActive);
+                    }}
+                  >
+                    Valider
+                  </p>
+                </h3>
+                <br />
+                <b>About this author:</b>
+                <p>{author}</p>
+                <p onClick={() => handleClick(id)}>X</p>
+                <br />
+              </div>
+            );
+          })}
       </div>
       <p>Livre choisi</p>
       <div>
