@@ -6,8 +6,11 @@ export const BookList = () => {
     query GetBook($id: Int!) {
       book(id: $id) {
         title
-        author
         id
+        author {
+          id
+          name
+        }
       }
     }
   `;
@@ -16,7 +19,10 @@ export const BookList = () => {
     query books {
       books {
         title
-        author
+        author {
+          id
+          name
+        }
         id
       }
     }
@@ -26,27 +32,36 @@ export const BookList = () => {
     mutation RemoveBook($id: Int!) {
       removeBook(id: $id) {
         title
-        author
+        author {
+          id
+          name
+        }
         id
       }
     }
   `;
 
   const UPDATE_BOOK = gql`
-    mutation UpdateBook($id: Int!, $title: String, $author: String) {
+    mutation UpdateBook($id: Int!, $title: String, $author: Author) {
       updateBook(id: $id, title: $title, author: $author) {
         title
-        author
+        author {
+          id
+          name
+        }
         id
       }
     }
   `;
 
   const ADD_BOOK = gql`
-    mutation AddBook($title: String!, $author: String!) {
+    mutation AddBook($title: String!, $author: Author!) {
       addBook(title: $title, author: $author) {
         title
-        author
+        author {
+          id
+          name
+        }
         id
       }
     }
@@ -99,18 +114,20 @@ export const BookList = () => {
     });
   };
 
-  const handleCache = async () => {
-    const { books } = await client.readQuery({ query: GET_BOOKS });
-    console.log("books ", books);
-    const filteredBooks = books.filter((book: any) => book.id !== 2);
-    console.log("filterted books ======", filteredBooks);
-    client.writeQuery({
-      query: GET_BOOKS,
-      data: {
-        books: filteredBooks,
-      },
-    });
-  };
+  // const handleCache = () => {
+  //   const data = client.readQuery({
+  //     query: GET_BOOK,
+  //     variables: { id: 1 },
+  //   });
+  //   client.cache.modify({
+  //     id: client.cache.identify(data?.book),
+  //     fields: {
+  //       title() {
+  //         return "Lord of the ring";
+  //       },
+  //     },
+  //   });
+  // };
 
   // const handleCache = () => {
   //   client.writeQuery({
@@ -127,9 +144,30 @@ export const BookList = () => {
   //   });
   // };
 
+  const handleCache = () => {
+    client.cache.evict({ id: "Book:1" });
+
+    const cache = {
+      ...client.cache.extract(),
+    };
+    console.log("cache before GC", cache);
+    client.cache.gc();
+    const cacheSnapshotAfterGC = {
+      ...client.cache.extract(),
+    };
+    console.log("cache after GC", cacheSnapshotAfterGC);
+    const keysBeforeGC = Object.keys(cache);
+    const keysAfterGC = Object.keys(cacheSnapshotAfterGC);
+
+    const removedKeys = keysBeforeGC.filter(
+      (key) => !keysAfterGC.includes(key)
+    );
+    console.log("Keys removed by GC:", removedKeys);
+  };
+
   return (
     <>
-      <button onClick={handleCache}>UPDATE CACHE</button>
+      <button onClick={handleCache}>CLEAN CACHE</button>
       <p>ajouter un livre: </p>
       <div>
         <form>
@@ -159,7 +197,6 @@ export const BookList = () => {
           BookList.length > 0 &&
           BookList.map(({ id, title, author }: any) => {
             const { books } = client.readQuery({ query: GET_BOOKS });
-            console.log("books", books);
             return (
               <div key={id}>
                 <h3 onClick={() => toggleInput(id)}>
@@ -183,7 +220,6 @@ export const BookList = () => {
                         ...inputIsActive,
                         isActive: false,
                       });
-                      console.log("inputIsActive", inputIsActive);
                     }}
                   >
                     Valider
@@ -191,7 +227,7 @@ export const BookList = () => {
                 </h3>
                 <br />
                 <b>About this author:</b>
-                <p>{author}</p>
+                <p>{author?.name}</p>
                 <p onClick={() => handleClick(id)}>X</p>
                 <br />
               </div>
@@ -203,7 +239,7 @@ export const BookList = () => {
         <h3>{dataBook?.book.title}</h3>
         <br />
         <b>About this author:</b>
-        <p>{dataBook?.book.author}</p>
+        <p>{dataBook?.book.author?.name}</p>
         <br />
       </div>
     </>

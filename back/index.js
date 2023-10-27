@@ -24,7 +24,12 @@ const typeDefs = `#graphql
   type Book {
     id: Int
     title: String
-    author: String
+    author: Author
+  }
+
+  type Author {
+    id: Int
+    name: String
   }
 
   # The "Query" type is special: it lists all of the available queries that
@@ -46,12 +51,18 @@ const books = [
   {
     id: 1,
     title: "The Awakening",
-    author: "Kate Chopin",
+    author:{
+        id: 1,
+        name: "Kate Chopin"
+    },
   },
   {
     id: 2,
     title: "City of Glass",
-    author: "Paul Auster",
+    author: {
+        id: 2,
+        name: "Paul Auster"
+    },
   },
 ];
 
