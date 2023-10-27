@@ -1,98 +1,80 @@
-import { ApolloServer, gql } from "apollo-server-express";
 import express from "express";
-import http from "http";
-import { PubSub } from "graphql-subscriptions";
+import { ApolloServer, gql } from "apollo-server-express";
+import GraphQLUpload from "graphql-upload/GraphQLUpload.mjs";
+import graphqlUploadExpress from "graphql-upload/graphqlUploadExpress.mjs";
+import { finished } from "stream/promises";
+import { ApolloServerPluginLandingPageLocalDefault } from "apollo-server-core";
+import cors from "cors";
+import fs from "fs";
 
-import { SubscriptionServer } from "subscriptions-transport-ws";
-import { makeExecutableSchema } from "@graphql-tools/schema";
-import { execute, subscribe } from "graphql";
+const UPLOAD_FOLDER = "./uploads";
 
-const pubsub = new PubSub();
+if (!fs.existsSync(UPLOAD_FOLDER)) {
+  fs.mkdirSync(UPLOAD_FOLDER);
+}
 
 const typeDefs = gql`
-  type Message {
-    content: String
-    id: Int
-  }
+  scalar Upload
 
-  type Mutation {
-    addMessage(content: String): Message
+  type File {
+    filename: String!
+    mimetype: String!
+    encoding: String!
+    url: String!
   }
 
   type Query {
-    messages: [Message]
-    addMessage(messageContent: String!): Message
+    otherFields: Boolean!
   }
-
-  type Subscription {
-    messageAdded: Message
+  type Mutation {
+    uploadFile(file: Upload!): File!
   }
 `;
 
-let messages = [];
-let messageId = 1;
-
 const resolvers = {
+  Upload: GraphQLUpload,
   Mutation: {
-    addMessage: (_, { content }) => {
-      const messageToSend = {
-        id: messageId++,
-        content: content,
-      };
-      messages.push(messageToSend);
-      pubsub.publish("MESSAGE_ADDED", { messageAdded: messageToSend });
-      return messageToSend;
-    },
-  },
-  Query: {
-    messages: () => messages,
-  },
-  Subscription: {
-    messageAdded: {
-      subscribe: () => pubsub.asyncIterator(["MESSAGE_ADDED"]),
+    uploadFile: async (_, { file }) => {
+      try {
+        console.log("FILE ===========", file)
+        const { createReadStream, filename, mimetype, encoding } = await file;
+        const stream = createReadStream();
+        const path = `${UPLOAD_FOLDER}/${filename}`;
+        await finished(stream.pipe(fs.createWriteStream(path)));
+        return {
+          filename,
+          mimetype,
+          encoding,
+          url: `http://localhost:4000/${path}`,
+        };
+      } catch (error) {
+        console.log("ERROR ===========", error);
+      }
     },
   },
 };
 
-const app = express();
-const schema = makeExecutableSchema({
-  typeDefs,
-  resolvers,
-});
-
-const apolloServer = new ApolloServer({
-  schema,
-  context: ({ req, res }) => {
-    return {
-      req,
-      res,
-      pubsub,
-    };
-  },
-});
-
-const startServer = async () => {
-  await apolloServer.start();
-  apolloServer.applyMiddleware({ app });
-
-  const httpServer = http.createServer(app);
-  const PORT = 4000;
-
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
+async function startServer() {
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+    stopOnTerminationSignals: false,
+    cache: "bounded",
+    plugins: [ApolloServerPluginLandingPageLocalDefault({ embed: true })],
   });
-  
-  new SubscriptionServer(
-    {
-      execute,
-      subscribe,
-      schema,
-    },
-    {
-      server: httpServer,
-      path: "/graphql",
-    }
-  );
-};
+  await server.start();
 
+  const app = express();
+  app.use(cors({ origin: "*" }));
+  app.use(
+    graphqlUploadExpress({ maxFieldSize: 2 * 1000 * 1000, maxFiles: 10 })
+  );
+
+  app.use("/uploads", express.static(UPLOAD_FOLDER));
+  server.applyMiddleware({ app });
+
+  await new Promise((r) => app.listen({ port: 4000 }, r));
+
+  console.log(`🚀 Server ready at http://localhost:4000${server.graphqlPath}`);
+}
 startServer();

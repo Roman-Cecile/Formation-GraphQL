@@ -17,10 +17,20 @@
     "apollo-server": "^3.12.1",
     "apollo-server-express": "^3.12.1",
     "express": "^4.18.2",
+    "graphql-upload": "^16.0.2",
     "graphql": "^16.8.1",
     "nodemon": "^3.0.1",
     "graphql-subscriptions": "^2.0.0",
+    "cors": "^2.8.5",
     "subscriptions-transport-ws": "^0.11.0"
+  },
+  "exports": {
+    "./GraphQLUpload.js": "./GraphQLUpload.js",
+    "./graphqlUploadExpress.js": "./graphqlUploadExpress.js",
+    "./graphqlUploadKoa.js": "./graphqlUploadKoa.js",
+    "./package.json": "./package.json",
+    "./processRequest.js": "./processRequest.js",
+    "./Upload.js": "./Upload.js"
   },
   "devDependencies": {
     "@types/node": "^20.8.9",
