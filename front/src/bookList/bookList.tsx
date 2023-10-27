@@ -17,8 +17,8 @@ export const BookList = () => {
   `;
 
   const GET_BOOKS = gql`
-    query books {
-      books {
+    query books($offset: Int, $limit: Int) {
+      books(offset: $offset, limit: $limit) {
         title
         number
         author {
@@ -74,10 +74,14 @@ export const BookList = () => {
 
   const client = useApolloClient();
 
-  const { loading, error, data } = useQuery(GET_BOOKS);
+  const [isFetching, setIsFetching] = useState(false);
+  const { loading, error, data, fetchMore } = useQuery(GET_BOOKS, {
+    variables: { offset: 0, limit: 1 },
+  });
   useEffect(() => {
     setBookList(data?.books);
-  }, [data]);
+  }, [data?.books]);
+
   const { data: dataBook } = useQuery(GET_BOOK, {
     variables: { id: 1 },
   });
@@ -173,10 +177,56 @@ export const BookList = () => {
   useEffect(() => {
     console.log("cache ========", client.cache.extract());
   }, []);
-
+  console.log("BookList", BookList);
   return (
     <>
       <button onClick={handleCache}>CLEAN CACHE</button>
+      {BookList?.length && (
+        <>
+          <button
+            onClick={() => {
+              fetchMore({
+                variables: { offset: BookList.length, limit: 1 },
+              })
+                .then((response) => {
+                  setIsFetching(true);
+                  setBookList((prevState: any) => [
+                    ...prevState,
+                    response.data.books[0],
+                  ]);
+                })
+                .catch((err) => {
+                  console.log("error", err);
+                })
+                .finally(() => {
+                  setIsFetching(false);
+                });
+            }}
+          >
+            GET MORE
+          </button>
+          <button
+            onClick={() => {
+              fetchMore({
+                variables: { offset: 0, limit: BookList.length - 1 },
+              })
+                .then((response) => {
+                  setIsFetching(true);
+                  setBookList(response.data.books);
+                })
+                .catch((err) => {
+                  console.log("error", err);
+                })
+                .finally(() => {
+                  setIsFetching(false);
+                });
+            }}
+          >
+            GET LESS
+          </button>
+        </>
+      )}
+
       <p>ajouter un livre: </p>
       <div>
         <form>
@@ -205,7 +255,6 @@ export const BookList = () => {
         {BookList &&
           BookList.length > 0 &&
           BookList.map(({ id, title, author }: any) => {
-            const { books } = client.readQuery({ query: GET_BOOKS });
             return (
               <div key={id}>
                 <h3 onClick={() => toggleInput(id)}>
