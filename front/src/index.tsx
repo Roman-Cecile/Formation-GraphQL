@@ -4,8 +4,22 @@ import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
-
-const cache = new InMemoryCache();
+const cache = new InMemoryCache({
+  typePolicies: {
+    Book: {
+      keyFields: ["number"], // Cette version donne : Book:{"number":10}
+    },
+  },
+});
+// const cache = new InMemoryCache({
+//   typePolicies: {
+//     Book: {
+//       keyFields: (obj) => {
+//         return `Book:${obj.number}`; // Cette version donne : Book:10
+//       },
+//     },
+//   },
+// });
 const client = new ApolloClient({
   uri: "http://localhost:4000",
   cache,

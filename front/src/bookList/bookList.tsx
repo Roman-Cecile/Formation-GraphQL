@@ -1,6 +1,5 @@
 import { useQuery, gql, useMutation, useApolloClient } from "@apollo/client";
 import { useEffect, useState } from "react";
-import { CachePersistor, LocalStorageWrapper } from "apollo3-cache-persist";
 
 export const BookList = () => {
   const GET_BOOK = gql`
@@ -8,6 +7,7 @@ export const BookList = () => {
       book(id: $id) {
         title
         id
+        number
         author {
           id
           name
@@ -20,6 +20,7 @@ export const BookList = () => {
     query books {
       books {
         title
+        number
         author {
           id
           name
@@ -38,6 +39,7 @@ export const BookList = () => {
           name
         }
         id
+        number
       }
     }
   `;
@@ -51,6 +53,7 @@ export const BookList = () => {
           name
         }
         id
+        number
       }
     }
   `;
@@ -64,6 +67,7 @@ export const BookList = () => {
           name
         }
         id
+        number
       }
     }
   `;
@@ -165,6 +169,10 @@ export const BookList = () => {
     );
     console.log("Keys removed by GC:", removedKeys);
   };
+
+  useEffect(() => {
+    console.log("cache ========", client.cache.extract());
+  }, []);
 
   return (
     <>

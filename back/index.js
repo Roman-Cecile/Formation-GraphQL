@@ -25,6 +25,7 @@ const typeDefs = `#graphql
     id: Int
     title: String
     author: Author
+    number: Int
   }
 
   type Author {
@@ -51,6 +52,7 @@ const books = [
   {
     id: 1,
     title: "The Awakening",
+    number: 10,
     author:{
         id: 1,
         name: "Kate Chopin"
@@ -59,6 +61,7 @@ const books = [
   {
     id: 2,
     title: "City of Glass",
+    number: 20,
     author: {
         id: 2,
         name: "Paul Auster"
@@ -102,6 +105,7 @@ const resolvers = {
         id: books.length + 1,
         title,
         author,
+        number: books.length + 10
       };
       books.push(newBook);
       return newBook;
