@@ -22,10 +22,24 @@ const typeDefs = `#graphql
   # This "Book" type defines the queryable fields for every book in our data source.
 
   type Book {
-    id: Int
     title: String
-    author: Author
     number: Int
+    author: Author
+    id: Int
+  }
+
+  type PageInfo {
+    hasNextPage: Boolean!
+    endCursor: String
+  }
+
+  type Edges {
+    node: Book
+  }
+
+  type PaginationBook {
+    pageInfos: PageInfo
+    edges: [Edges]
   }
 
   type Author {
@@ -37,7 +51,7 @@ const typeDefs = `#graphql
   # clients can execute, along with the return type for each. In this
   # case, the "books" query returns an array of zero or more Books (defined above).
   type Query {
-    books: [Book]
+    books(offset: Int, limit: Int): PaginationBook
     book(id: Int!): Book
   }
 
@@ -53,9 +67,9 @@ const books = [
     id: 1,
     title: "The Awakening",
     number: 10,
-    author:{
-        id: 1,
-        name: "Kate Chopin"
+    author: {
+      id: 1,
+      name: "Kate Chopin",
     },
   },
   {
@@ -63,16 +77,31 @@ const books = [
     title: "City of Glass",
     number: 20,
     author: {
-        id: 2,
-        name: "Paul Auster"
+      id: 2,
+      name: "Paul Auster",
     },
   },
 ];
 
 const resolvers = {
   Query: {
-    books: () => books,
-    book: (_, { id } ) => books.find((book) => book.id === id)
+    books: (_, { offset, limit }) => {
+      console.log(offset, limit);
+      const booksList = books.slice(offset, offset + limit);
+      console.log({ booksList });
+      return {
+        pageInfos: {
+          hasNextPage: books.length > offset + limit,
+          endCursor: books.length > offset + limit ? offset + limit : null,
+        },
+        edges: booksList.map((book) => {
+          return {
+            node: book,
+          };
+        }),
+      };
+    },
+    book: (_, { id }) => books.find((book) => book.id === id),
   },
   Mutation: {
     removeBook: (_, { id }) => {
@@ -85,32 +114,31 @@ const resolvers = {
     },
     updateBook: (_, { id, title, author }) => {
       const bookIndex = books.findIndex((book) => book.id === id);
-      if(bookIndex === -1) {
+      if (bookIndex === -1) {
         throw new Error("Book not found");
       }
-      const updatedBook = books[bookIndex]
-      if(title) {
-       updatedBook.title = title;
+      const updatedBook = books[bookIndex];
+      if (title) {
+        updatedBook.title = title;
       }
-      if(author) {
+      if (author) {
         updatedBook.author = author;
       }
 
       books[bookIndex] = updatedBook;
-      return updatedBook
-
+      return updatedBook;
     },
     addBook: (_, { title, author }) => {
       const newBook = {
         id: books.length + 1,
         title,
         author,
-        number: books.length + 10
+        number: books.length + 10,
       };
       books.push(newBook);
       return newBook;
-    }
-  }
+    },
+  },
 };
 
 // The ApolloServer constructor requires two parameters: your schema

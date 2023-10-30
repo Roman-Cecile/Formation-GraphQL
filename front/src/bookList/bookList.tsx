@@ -19,13 +19,21 @@ export const BookList = () => {
   const GET_BOOKS = gql`
     query books($offset: Int, $limit: Int) {
       books(offset: $offset, limit: $limit) {
-        title
-        number
-        author {
-          id
-          name
+        pageInfos {
+          hasNextPage
+          endCursor
         }
-        id
+        edges {
+          node {
+            title
+            number
+            author {
+              id
+              name
+            }
+            id
+          }
+        }
       }
     }
   `;
@@ -79,8 +87,9 @@ export const BookList = () => {
     variables: { offset: 0, limit: 1 },
   });
   useEffect(() => {
-    setBookList(data?.books);
-  }, [data?.books]);
+    console.log("data", data);
+    setBookList(data?.books.edges);
+  }, [data?.books.edges]);
 
   const { data: dataBook } = useQuery(GET_BOOK, {
     variables: { id: 1 },
@@ -90,7 +99,7 @@ export const BookList = () => {
   const [updateBook] = useMutation(UPDATE_BOOK);
   const [addBook] = useMutation(ADD_BOOK);
 
-  const [BookList, setBookList] = useState(data?.books || []);
+  const [BookList, setBookList] = useState(data?.books.edges || []);
   const handleClick = (id: number) => {
     removeBook({
       variables: { id },
@@ -192,7 +201,7 @@ export const BookList = () => {
                   setIsFetching(true);
                   setBookList((prevState: any) => [
                     ...prevState,
-                    response.data.books[0],
+                    ...response.data.books.edges,
                   ]);
                 })
                 .catch((err) => {
@@ -254,12 +263,12 @@ export const BookList = () => {
       <div>
         {BookList &&
           BookList.length > 0 &&
-          BookList.map(({ id, title, author }: any) => {
+          BookList.map((book: any) => {
             return (
-              <div key={id}>
-                <h3 onClick={() => toggleInput(id)}>
+              <div key={book.node.id}>
+                <h3 onClick={() => toggleInput(book.node.id)}>
                   {inputIsActive.isActive &&
-                  id === inputIsActive.currentBookId ? (
+                  book.node.id === inputIsActive.currentBookId ? (
                     <input
                       value={inputValue}
                       onChange={(event: any) =>
@@ -267,12 +276,12 @@ export const BookList = () => {
                       }
                     />
                   ) : (
-                    title
+                    book.node.title
                   )}
                   <p
                     onClick={() => {
                       updateBook({
-                        variables: { id, title: inputValue },
+                        variables: { id: book.node.id, title: inputValue },
                       });
                       setInputIsActive({
                         ...inputIsActive,
@@ -285,8 +294,8 @@ export const BookList = () => {
                 </h3>
                 <br />
                 <b>About this author:</b>
-                <p>{author?.name}</p>
-                <p onClick={() => handleClick(id)}>X</p>
+                <p>{book.node.author?.name}</p>
+                <p onClick={() => handleClick(book.node.id)}>X</p>
                 <br />
               </div>
             );
